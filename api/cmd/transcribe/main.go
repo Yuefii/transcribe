@@ -15,6 +15,7 @@ import (
 func main() {
 	config.InitDB()
 	config.AutoMigrate()
+	config.InitRedis()
 
 	err := godotenv.Load()
 	if err != nil {
@@ -22,6 +23,7 @@ func main() {
 	}
 
 	app := fiber.New(fiber.Config{
+		BodyLimit: 100 * 1024 * 1024,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 				"error": err.Error(),

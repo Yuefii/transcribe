@@ -10,6 +10,7 @@ import (
 func SetupRoutes(app *fiber.App) {
 	authHandler := http.NewAuthHandler()
 	userHandler := http.NewUserHandler()
+	transcriptionHandler := http.NewTranscriptionHandler()
 
 	api := app.Group("/api")
 
@@ -27,4 +28,10 @@ func SetupRoutes(app *fiber.App) {
 	proctected := api.Group("/user", middleware.AuthMiddleware)
 	proctected.Get("/profile", userHandler.GetProfile)
 	proctected.Put("/profile", userHandler.UpdateProfile)
+
+	transcribe := api.Group("/transcribe", middleware.AuthMiddleware)
+	transcribe.Post("/", transcriptionHandler.CreateJob)
+	transcribe.Get("/:job_id", transcriptionHandler.GetJobStatus)
+	transcribe.Get("/", transcriptionHandler.GetUserJobs)
+	transcribe.Delete("/:job_id", transcriptionHandler.DeleteJob)
 }

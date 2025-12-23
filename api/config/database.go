@@ -33,7 +33,7 @@ func InitDB() {
 }
 
 func AutoMigrate() {
-	err := DB.AutoMigrate(&domain.User{})
+	err := DB.AutoMigrate(&domain.User{}, &domain.TranscriptionJob{})
 
 	if err != nil {
 		log.Fatal("failed to migrate database:", err)
