@@ -73,7 +73,7 @@ func (h *TranscriptionHandler) CreateJob(c *fiber.Ctx) error {
 
 	userDir := filepath.Join(uploadDir, fmt.Sprintf("user_%d", userID))
 
-	if err := os.Mkdir(userDir, 0755); err != nil {
+	if err := os.Mkdir(userDir, 0755); err != nil && !os.IsExist(err) {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create upload directory",
 		})
