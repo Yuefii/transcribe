@@ -1,0 +1,56 @@
+.env
+
+# =========================
+# Python bytecode
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+
+# =========================
+# Virtual environment
+# =========================
+venv/
+.env/
+.envrc
+.venv/
+ENV/
+env/
+pip-log.txt
+
+# =========================
+# Environment variables
+# =========================
+*.env
+.env.*
+
+# =========================
+# Distribution / packaging
+# =========================
+build/
+dist/
+eggs/
+*.egg-info/
+.eggs/
+*.egg
+
+# =========================
+# PyInstaller
+# =========================
+*.manifest
+*.spec
+
+# =========================
+# Test & coverage
+# =========================
+.coverage
+coverage.xml
+htmlcov/
+.pytest_cache/
+.tox/
+.nox/
+
+# =========================
+# Logs
+# =========================
+*.log

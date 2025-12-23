@@ -1,0 +1,5 @@
+redis
+mysql-connector-python
+openai-whisper
+torch
+ffmpeg-python
