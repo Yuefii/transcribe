@@ -1,0 +1,32 @@
+# Binary files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+
+# Output of go build
+/bin/
+/build/
+/dist/
+
+# Vendor directory (if you commit dependencies, ignore if using Go modules)
+/vendor/
+
+# Dependency directories (remove if using Go modules)
+Godeps/
+glide.lock
+vendor/
+*_vendor/
+
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Coverage files
+coverage.out
+
+.env
