@@ -1,14 +1,13 @@
 package config
 
 import (
-	"log"
-	"os"
 	"time"
 	"transcribe/internal/domain"
+	"transcribe/pkg/logger"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"gorm.io/gorm/logger"
+	gormlogger "gorm.io/gorm/logger"
 )
 
 var DB *gorm.DB
@@ -18,24 +17,24 @@ func InitDB() {
 
 	dsn := AppConfig.DatabaseURL
 
-	var gormLogger logger.Interface
+	var gormLogger gormlogger.Interface
 
 	if AppConfig.AppEnv == "development" {
-		gormLogger = logger.New(
-			log.New(os.Stdout, "\r\n", log.LstdFlags),
-			logger.Config{
+		gormLogger = gormlogger.New(
+			logger.Log,
+			gormlogger.Config{
 				SlowThreshold:             200 * time.Millisecond,
-				LogLevel:                  logger.Info,
+				LogLevel:                  gormlogger.Info,
 				IgnoreRecordNotFoundError: true,
 				Colorful:                  true,
 			},
 		)
 	} else {
-		gormLogger = logger.New(
-			log.New(os.Stdout, "\r\n", log.LstdFlags),
-			logger.Config{
-				SlowThreshold:             1000 * time.Millisecond,
-				LogLevel:                  logger.Warn,
+		gormLogger = gormlogger.New(
+			logger.Log,
+			gormlogger.Config{
+				SlowThreshold:             1000 * time.Millisecond, // 1 second
+				LogLevel:                  gormlogger.Warn,
 				IgnoreRecordNotFoundError: true,
 				Colorful:                  false,
 			},
@@ -47,18 +46,18 @@ func InitDB() {
 	})
 
 	if err != nil {
-		log.Fatal("failed to connect database:", err)
+		logger.Log.Fatal("failed to connect database:", err)
 	}
 
-	log.Println("database connected successfully")
+	logger.Log.Info("database connected successfully")
 }
 
 func AutoMigrate() {
 	err := DB.AutoMigrate(&domain.User{}, &domain.TranscriptionJob{})
 
 	if err != nil {
-		log.Fatal("failed to migrate database:", err)
+		logger.Log.Fatal("failed to migrate database:", err)
 	}
 
-	log.Println("database migrated successfully")
+	logger.Log.Info("database migrated successfully")
 }

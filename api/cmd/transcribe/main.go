@@ -1,10 +1,11 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"transcribe/config"
 	"transcribe/internal/delivery/routes"
 	"transcribe/pkg/helpers"
+	"transcribe/pkg/logger"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -12,6 +13,7 @@ import (
 
 func main() {
 	config.LoadConfig()
+	logger.Init(config.AppConfig.AppEnv)
 	helpers.InitJWT()
 
 	config.InitDB()
@@ -21,6 +23,8 @@ func main() {
 	app := fiber.New(fiber.Config{
 		BodyLimit: 100 * 1024 * 1024,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			logger.Log.Error(err)
+
 			if config.AppConfig.AppEnv == "development" {
 				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 					"error": err.Error(),
@@ -38,6 +42,6 @@ func main() {
 
 	port := config.AppConfig.Port
 
-	log.Printf("server running on port %s in %s mode", port, config.AppConfig.AppEnv)
-	log.Fatal(app.Listen(":" + port))
+	logger.Log.Infof("server running on port %s in %s mode", port, config.AppConfig.AppEnv)
+	logger.Log.Fatal(app.Listen(fmt.Sprintf(":%s", port)))
 }
