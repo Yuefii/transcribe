@@ -2,6 +2,8 @@ package config
 
 import (
 	"log"
+	"os"
+	"time"
 	"transcribe/internal/domain"
 
 	"gorm.io/driver/mysql"
@@ -19,9 +21,25 @@ func InitDB() {
 	var gormLogger logger.Interface
 
 	if AppConfig.AppEnv == "development" {
-		gormLogger = logger.Default.LogMode(logger.Info)
+		gormLogger = logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             200 * time.Millisecond,
+				LogLevel:                  logger.Info,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  true,
+			},
+		)
 	} else {
-		gormLogger = logger.Default.LogMode(logger.Warn)
+		gormLogger = logger.New(
+			log.New(os.Stdout, "\r\n", log.LstdFlags),
+			logger.Config{
+				SlowThreshold:             1000 * time.Millisecond,
+				LogLevel:                  logger.Warn,
+				IgnoreRecordNotFoundError: true,
+				Colorful:                  false,
+			},
+		)
 	}
 
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
