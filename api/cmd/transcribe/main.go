@@ -2,31 +2,32 @@ package main
 
 import (
 	"log"
-	"os"
 	"transcribe/config"
 	"transcribe/internal/delivery/routes"
-
-	"github.com/joho/godotenv"
+	"transcribe/pkg/helpers"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
+	config.LoadConfig()
+	helpers.InitJWT()
+
 	config.InitDB()
 	config.AutoMigrate()
 	config.InitRedis()
 
-	err := godotenv.Load()
-	if err != nil {
-		log.Println("No .env file found")
-	}
-
 	app := fiber.New(fiber.Config{
 		BodyLimit: 100 * 1024 * 1024,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
+			if config.AppConfig.AppEnv == "development" {
+				return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+					"error": err.Error(),
+				})
+			}
 			return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
-				"error": err.Error(),
+				"error": "Internal Server Error",
 			})
 		},
 	})
@@ -35,11 +36,8 @@ func main() {
 
 	routes.SetupRoutes(app)
 
-	port := os.Getenv("PORT")
-	if port == "" {
-		log.Fatal("environment variable PORT is not set")
-	}
+	port := config.AppConfig.Port
 
-	log.Printf("server running on port %s", port)
+	log.Printf("server running on port %s in %s mode", port, config.AppConfig.AppEnv)
 	log.Fatal(app.Listen(":" + port))
 }

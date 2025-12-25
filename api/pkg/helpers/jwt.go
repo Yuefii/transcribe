@@ -2,30 +2,16 @@ package helpers
 
 import (
 	"errors"
-	"log"
-	"os"
 	"time"
+	"transcribe/config"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/joho/godotenv"
 )
 
 var jwtSecret []byte
 
-func init() {
-	err := godotenv.Load()
-
-	if err != nil {
-		log.Println("No .env file found")
-	}
-
-	secret := os.Getenv("JWT_SECRET")
-
-	if secret == "" {
-		log.Fatal("environment variable JWT_SECRET is not set")
-	}
-
-	jwtSecret = []byte(secret)
+func InitJWT() {
+	jwtSecret = []byte(config.AppConfig.JWTSecret)
 }
 
 type Claims struct {

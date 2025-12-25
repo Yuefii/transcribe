@@ -2,7 +2,6 @@ package config
 
 import (
 	"log"
-	"os"
 	"transcribe/internal/domain"
 
 	"gorm.io/driver/mysql"
@@ -15,14 +14,18 @@ var DB *gorm.DB
 func InitDB() {
 	var err error
 
-	dsn := os.Getenv("DATABASE_URL")
+	dsn := AppConfig.DatabaseURL
 
-	if dsn == "" {
-		log.Fatal("environment variable DATABASE_URL is not set")
+	var gormLogger logger.Interface
+
+	if AppConfig.AppEnv == "development" {
+		gormLogger = logger.Default.LogMode(logger.Info)
+	} else {
+		gormLogger = logger.Default.LogMode(logger.Warn)
 	}
 
 	DB, err = gorm.Open(mysql.Open(dsn), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: gormLogger,
 	})
 
 	if err != nil {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -65,15 +64,11 @@ func (h *TranscriptionHandler) CreateJob(c *fiber.Ctx) error {
 
 	jobID := uuid.New().String()
 
-	uploadDir := os.Getenv("UPLOAD_DIR")
-
-	if uploadDir == "" {
-		log.Fatal("environment variable UPLOAD_DIR is not set")
-	}
+	uploadDir := config.AppConfig.UploadDir
 
 	userDir := filepath.Join(uploadDir, fmt.Sprintf("user_%d", userID))
 
-	if err := os.Mkdir(userDir, 0755); err != nil && !os.IsExist(err) {
+	if err := os.MkdirAll(userDir, 0755); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": "failed to create upload directory",
 		})
