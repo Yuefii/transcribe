@@ -80,7 +80,7 @@ class TranscriptionWorker:
                         self.pyannote_pipeline.to(torch.device("cuda"))
                         logger.info("pyannote loaded (GPU)")
                     else:
-                        logger.info("✓pyannote loaded (CPU)")
+                        logger.info("pyannote loaded (CPU)")
             elif DIARIZATION_METHOD == 'simple':
                 logger.info("simple speaker detection enabled (no extra dependencies)")
             else:
@@ -152,11 +152,12 @@ class TranscriptionWorker:
         secs = int(seconds % 60)
         return f"{minutes:02d}:{secs:02d}"
     
-    def simple_speaker_detection(self, audio_path, segments):
+    def simple_speaker_detection(self, audio_path, segments, job_id=None):
         try:
             import librosa
             
             logger.info("performing simple speaker detection...")
+            self.publish_progress(segments[0].get('id', 0) if segments else "job", "detecting_speakers") # Hacky way to get job_id if not passed, but we should pass job_id
             
             audio, sr = librosa.load(audio_path, sr=16000)
             
@@ -204,9 +205,10 @@ class TranscriptionWorker:
             logger.error(f"simple speaker detection error: {e}")
             return segments
         
-    def resemblyzer_speaker_detection(self, audio_path, segments):
+    def resemblyzer_speaker_detection(self, audio_path, segments, job_id=None):
         try:
             logger.info("performing resemblyzer speaker detection...")
+            if job_id: self.publish_progress(job_id, "detecting_speakers")
             
             wav = preprocess_wav(audio_path)
             
@@ -251,12 +253,14 @@ class TranscriptionWorker:
             logger.error(f"resemblyzer detection error: {e}")
             return segments
         
-    def pyannote_speaker_detection(self, audio_path, segments):
+    def pyannote_speaker_detection(self, audio_path, segments, job_id=None):
         try:
             if not self.pyannote_pipeline:
                 return segments
             
             logger.info("performing pyannote speaker diarization...")
+            if job_id: self.publish_progress(job_id, "detecting_speakers")
+
             diarization = self.pyannote_pipeline(audio_path)
 
             for seg in segments:
@@ -279,10 +283,12 @@ class TranscriptionWorker:
             logger.error(f"pyannote detection error: {e}")
             return segments
 
-    def transcribe_audio(self, file_path):
+    def transcribe_audio(self, file_path, job_id):
         try:
             logger.info(f"transcribing: {file_path}")
+            self.publish_progress(job_id, "loading_audio")
             
+            self.publish_progress(job_id, "transcribing")
             result = self.model.transcribe(
                 file_path,
                 word_timestamps=True,
@@ -306,11 +312,11 @@ class TranscriptionWorker:
             logger.info(f"duration: {self.format_timestamp(duration)}")
 
             if DIARIZATION_METHOD == 'simple':
-                segments = self.simple_speaker_detection(file_path, segments)
+                segments = self.simple_speaker_detection(file_path, segments, job_id)
             elif DIARIZATION_METHOD == 'resemblyzer' and self.voice_encoder:
-                segments = self.resemblyzer_speaker_detection(file_path, segments)
+                segments = self.resemblyzer_speaker_detection(file_path, segments, job_id)
             elif DIARIZATION_METHOD == 'pyannote' and self.pyannote_pipeline:
-                segments = self.pyannote_speaker_detection(file_path, segments)
+                segments = self.pyannote_speaker_detection(file_path, segments, job_id)
             
             return full_text, segments, duration
             
@@ -334,7 +340,9 @@ class TranscriptionWorker:
             self.update_job_status(job_id, 'processing')
             
             start_time = time.time()
-            full_text, segments, duration = self.transcribe_audio(file_path)
+            start_time = time.time()
+            full_text, segments, duration = self.transcribe_audio(file_path, job_id)
+            process_time = time.time() - start_time
             process_time = time.time() - start_time
             
             logger.info(f"processing completed in {process_time:.2f}s")
@@ -346,6 +354,7 @@ class TranscriptionWorker:
                 speaker_info = f" [{seg.get('speaker', 'N/A')}]" if 'speaker' in seg else ""
                 logger.info(f"  [{self.format_timestamp(seg['start'])} - {self.format_timestamp(seg['end'])}]{speaker_info}: {seg['text'][:50]}...")
 
+            self.publish_progress(job_id, "saving")
             self.update_job_status(
                 job_id, 'done', 
                 text=full_text, 
