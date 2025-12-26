@@ -34,9 +34,9 @@ func SetupRoutes(app *fiber.App) {
 
 	transcribe := api.Group("/transcribe", middleware.AuthMiddleware)
 	transcribe.Post("/", transcriptionHandler.CreateJob)
+	transcribe.Post("/:job_id/cancel", transcriptionHandler.CancelJob)
 	transcribe.Get("/:job_id", transcriptionHandler.GetJobStatus)
 	transcribe.Get("/", transcriptionHandler.GetUserJobs)
-
 	transcribe.Delete("/:job_id", transcriptionHandler.DeleteJob)
 
 	ws := api.Group("/ws", middleware.AuthMiddleware, realtimeHandler.WSUpgrade)

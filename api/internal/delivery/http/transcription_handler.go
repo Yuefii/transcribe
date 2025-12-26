@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"transcribe/config"
 	"transcribe/internal/domain"
@@ -312,5 +313,60 @@ func (h *TranscriptionHandler) DeleteJob(c *fiber.Ctx) error {
 
 	return c.JSON(fiber.Map{
 		"message": "job deleted successfully",
+	})
+}
+
+func (h *TranscriptionHandler) CancelJob(c *fiber.Ctx) error {
+	userID := c.Locals("user_id").(uint)
+	jobID := c.Params("job_id")
+	ctx := context.Background()
+
+	log := logger.Log.WithFields(logrus.Fields{
+		"user_id": userID,
+		"job_id":  jobID,
+	})
+
+	job, err := h.transcriptionRepo.FindByID(jobID)
+	
+	if err != nil {
+		log.Warnf("job not found for cancellation: %v", err)
+		return c.Status(fiber.StatusNotFound).JSON(fiber.Map{
+			"error": "job not found",
+		})
+	}
+
+	if job.UserID != userID {
+		log.Warn("access denied for job cancellation")
+		return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+			"error": "access denied",
+		})
+	}
+
+	if job.Status == "done" || job.Status == "failed" || job.Status == "cancelled" {
+		return c.Status(fiber.StatusBadRequest).JSON(fiber.Map{
+			"error": "job is already finished or cancelled",
+		})
+	}
+
+	cancelKey := "job_cancellation:" + jobID
+
+	if err := config.RedisClient.Set(ctx, cancelKey, "1", 24*time.Hour).Err(); err != nil {
+		log.Errorf("failed to set cancellation signal in redis: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
+			"error": "failed to process cancellation signal",
+		})
+	}
+
+	job.Status = "cancelled"
+
+	if err := h.transcriptionRepo.UpdateStatus(job.ID, "cancelled", nil, nil, nil, nil); err != nil {
+		 log.Errorf("failed to update job status to cancelled: %v", err)
+	}
+
+	log.Info("job cancellation signal sent")
+
+	return c.JSON(fiber.Map{
+		"message": "job cancellation request sent",
+		"status":  "cancelled",
 	})
 }

@@ -7,6 +7,7 @@ import redis
 import mysql.connector
 import whisper
 import torch
+import torch.multiprocessing as mp
 import numpy as np
 from sklearn.cluster import AgglomerativeClustering
 from resemblyzer import VoiceEncoder, preprocess_wav
@@ -34,6 +35,20 @@ DB_CONFIG = {
 MODEL_SIZE = os.getenv('WHISPER_MODEL', 'small')
 DIARIZATION_METHOD = os.getenv('DIARIZATION_METHOD', 'none')
 HF_TOKEN = os.getenv('HUGGINGFACE_TOKEN', '')
+
+class JobCancelledException(Exception):
+    pass
+
+def run_whisper_inference(model, file_path, queue):
+    try:
+        result = model.transcribe(
+            file_path,
+            word_timestamps=True,
+            verbose=False
+        )
+        queue.put({"success": True, "result": result})
+    except Exception as e:
+        queue.put({"success": False, "error": str(e)})
 
 class TranscriptionWorker:
     def __init__(self):
@@ -151,18 +166,28 @@ class TranscriptionWorker:
         minutes = int(seconds // 60)
         secs = int(seconds % 60)
         return f"{minutes:02d}:{secs:02d}"
+
+    def check_cancellation(self, job_id):
+        key = f"job_cancellation:{job_id}"
+        if self.redis_client.exists(key):
+            logger.warning(f"job {job_id} was cancelled by user")
+            self.redis_client.delete(key)
+            raise JobCancelledException("Job was cancelled by user")
     
     def simple_speaker_detection(self, audio_path, segments, job_id=None):
         try:
             import librosa
             
             logger.info("performing simple speaker detection...")
-            self.publish_progress(segments[0].get('id', 0) if segments else "job", "detecting_speakers") # Hacky way to get job_id if not passed, but we should pass job_id
+            if job_id: 
+                self.check_cancellation(job_id)
+                self.publish_progress(job_id, "detecting_speakers") 
             
             audio, sr = librosa.load(audio_path, sr=16000)
             
             segment_features = []
             for seg in segments:
+                if job_id: self.check_cancellation(job_id)
                 start_sample = int(seg['start'] * sr)
                 end_sample = int(seg['end'] * sr)
                 segment_audio = audio[start_sample:end_sample]
@@ -208,12 +233,15 @@ class TranscriptionWorker:
     def resemblyzer_speaker_detection(self, audio_path, segments, job_id=None):
         try:
             logger.info("performing resemblyzer speaker detection...")
-            if job_id: self.publish_progress(job_id, "detecting_speakers")
+            if job_id: 
+                self.check_cancellation(job_id)
+                self.publish_progress(job_id, "detecting_speakers")
             
             wav = preprocess_wav(audio_path)
             
             embeddings = []
             for seg in segments:
+                if job_id: self.check_cancellation(job_id)
                 start_sample = int(seg['start'] * 16000)
                 end_sample = int(seg['end'] * 16000)
                 segment_wav = wav[start_sample:end_sample]
@@ -259,7 +287,9 @@ class TranscriptionWorker:
                 return segments
             
             logger.info("performing pyannote speaker diarization...")
-            if job_id: self.publish_progress(job_id, "detecting_speakers")
+            if job_id: 
+                self.check_cancellation(job_id)
+                self.publish_progress(job_id, "detecting_speakers")
 
             diarization = self.pyannote_pipeline(audio_path)
 
@@ -286,14 +316,39 @@ class TranscriptionWorker:
     def transcribe_audio(self, file_path, job_id):
         try:
             logger.info(f"transcribing: {file_path}")
+            self.check_cancellation(job_id)
             self.publish_progress(job_id, "loading_audio")
             
+            self.check_cancellation(job_id)
             self.publish_progress(job_id, "transcribing")
-            result = self.model.transcribe(
-                file_path,
-                word_timestamps=True,
-                verbose=False
-            )
+            
+            self.check_cancellation(job_id)
+            self.publish_progress(job_id, "transcribing")
+            
+            ctx = mp.get_context('spawn')
+            queue = ctx.Queue()
+            p = ctx.Process(target=run_whisper_inference, args=(self.model, file_path, queue))
+            p.start()
+            
+            while p.is_alive():
+                try:
+                    self.check_cancellation(job_id)
+                except JobCancelledException:
+                    p.terminate()
+                    p.join()
+                    raise
+                
+                time.sleep(1)
+            
+            p.join()
+            
+            if not queue.empty():
+                q_result = queue.get()
+                if not q_result["success"]:
+                    raise Exception(q_result["error"])
+                result = q_result["result"]
+            else:
+                 raise Exception("transcription process failed or returned no result")
             
             full_text = result['text'].strip()
             duration = result.get('duration', 0)
@@ -363,6 +418,10 @@ class TranscriptionWorker:
             )
             
             logger.info(f"job {job_id} completed successfully")
+            
+        except JobCancelledException as e:
+            logger.warning(f"job {job_id} cancelled execution")
+            self.update_job_status(job_id, 'cancelled', error_msg=str(e))
             
         except Exception as e:
             error_msg = str(e)
