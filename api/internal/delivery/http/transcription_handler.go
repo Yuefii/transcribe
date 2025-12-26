@@ -176,12 +176,20 @@ func (h *TranscriptionHandler) GetJobStatus(c *fiber.Ctx) error {
 		Status:      job.Status,
 		FileName:    job.FileName,
 		FileSize:    job.FileSize,
+		Duration:    job.Duration,
 		CreatedAt:   job.CreatedAt,
 		CompletedAt: job.CompletedAt,
 	}
 
 	if job.Status == "done" {
 		response.Text = job.Text
+
+		if job.Segments != "" {
+			var segments []domain.Segment
+			if err := json.Unmarshal([]byte(job.Segments), &segments); err == nil {
+				response.Segments = segments
+			}
+		}
 	}
 
 	if job.Status == "failed" {
@@ -227,11 +235,19 @@ func (h *TranscriptionHandler) GetUserJobs(c *fiber.Ctx) error {
 			Status:      job.Status,
 			FileName:    job.FileName,
 			FileSize:    job.FileSize,
+			Duration:    job.Duration,
 			CreatedAt:   job.CreatedAt,
 			CompletedAt: job.CompletedAt,
 		}
 		if job.Status == "done" {
 			resp.Text = job.Text
+
+			if job.Segments != "" {
+				var segments []domain.Segment
+				if err := json.Unmarshal([]byte(job.Segments), &segments); err == nil {
+					resp.Segments = segments
+				}
+			}
 		}
 
 		if job.Status == "failed" {

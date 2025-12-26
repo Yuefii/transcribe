@@ -56,7 +56,7 @@ func (r *TranscriptionRepository) FindByUserID(userID uint, page, pageSize int) 
 	return jobs, total, nil
 }
 
-func (r *TranscriptionRepository) UpdateStatus(jobID, status string, text, errorMsg *string) error {
+func (r *TranscriptionRepository) UpdateStatus(jobID, status string, text, errorMsg *string, segments *string, duration *float64) error {
 	updates := map[string]interface{}{
 		"status": status,
 	}
@@ -69,13 +69,20 @@ func (r *TranscriptionRepository) UpdateStatus(jobID, status string, text, error
 		updates["error_msg"] = *errorMsg
 	}
 
+	if segments != nil {
+		updates["segments"] = *segments
+	}
+
+	if duration != nil {
+		updates["duration"] = *duration
+	}
+
 	if status == "done" || status == "failed" {
 		now := time.Now()
 		updates["completed_at"] = now
 	}
 
 	result := config.DB.Model(&domain.TranscriptionJob{}).Where("id = ?", jobID).Updates(updates)
-
 	return result.Error
 }
 

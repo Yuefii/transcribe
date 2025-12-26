@@ -3,3 +3,8 @@ mysql-connector-python
 openai-whisper
 torch
 ffmpeg-python
+librosa
+scikit-learn
+resemblyzer
+pyannote.audio
+torchaudio
