@@ -14,6 +14,13 @@ func AuthMiddleware(c *fiber.Ctx) error {
 	log := logger.Log.WithField("request_ip", c.IP())
 
 	if authHeader == "" {
+		tokenS := c.Query("token")
+		if tokenS != "" {
+			authHeader = "Bearer " + tokenS
+		}
+	}
+
+	if authHeader == "" {
 		log.Warn("missing authorization header")
 
 		return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{

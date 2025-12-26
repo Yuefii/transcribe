@@ -4,13 +4,16 @@ import (
 	"transcribe/internal/delivery/http"
 	"transcribe/pkg/middleware"
 
+	"github.com/gofiber/contrib/websocket"
 	"github.com/gofiber/fiber/v2"
 )
 
 func SetupRoutes(app *fiber.App) {
 	authHandler := http.NewAuthHandler()
 	userHandler := http.NewUserHandler()
+
 	transcriptionHandler := http.NewTranscriptionHandler()
+	realtimeHandler := http.NewRealtimeHandler()
 
 	api := app.Group("/api")
 
@@ -33,5 +36,9 @@ func SetupRoutes(app *fiber.App) {
 	transcribe.Post("/", transcriptionHandler.CreateJob)
 	transcribe.Get("/:job_id", transcriptionHandler.GetJobStatus)
 	transcribe.Get("/", transcriptionHandler.GetUserJobs)
+
 	transcribe.Delete("/:job_id", transcriptionHandler.DeleteJob)
+
+	ws := api.Group("/ws", middleware.AuthMiddleware, realtimeHandler.WSUpgrade)
+	ws.Get("/job/:job_id", websocket.New(realtimeHandler.ListenForProgress))
 }

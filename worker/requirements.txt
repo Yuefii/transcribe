@@ -8,3 +8,4 @@ scikit-learn
 resemblyzer
 pyannote.audio
 torchaudio
+websockets

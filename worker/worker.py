@@ -31,7 +31,7 @@ DB_CONFIG = {
     'database': os.getenv('DB_NAME', 'transcribe')
 }
 
-MODEL_SIZE = os.getenv('WHISPER_MODEL', 'base')
+MODEL_SIZE = os.getenv('WHISPER_MODEL', 'small')
 DIARIZATION_METHOD = os.getenv('DIARIZATION_METHOD', 'none')
 HF_TOKEN = os.getenv('HUGGINGFACE_TOKEN', '')
 
@@ -126,9 +126,26 @@ class TranscriptionWorker:
             cursor.close()
             logger.info(f"job {job_id} status updated to: {status}")
 
+            self.publish_progress(job_id, status)
+
         except Exception as e:
             logger.error(f"database error updating job {job_id}: {e}")
             self.db_connection.rollback()
+    
+    def publish_progress(self, job_id, status, progress=None):
+        try:
+            message = {
+                "job_id": job_id,
+                "status": status,
+                "timestamp": datetime.now().isoformat()
+            }
+            if progress is not None:
+                message["progress"] = progress
+            
+            self.redis_client.publish(f"job_progress:{job_id}", json.dumps(message))
+            logger.debug(f"published progress for {job_id}: {status}")
+        except Exception as e:
+            logger.error(f"redis publish error: {e}")
     
     def format_timestamp(self, seconds):
         minutes = int(seconds // 60)
