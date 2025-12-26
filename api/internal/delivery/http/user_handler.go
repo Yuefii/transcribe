@@ -78,6 +78,6 @@ func (h *UserHandler) UpdateProfile(c *fiber.Ctx) error {
 	log.Info("profile updated successfully")
 
 	return c.JSON(fiber.Map{
-		"message": "profile update succesfully",
+		"message": "profile update successfully",
 	})
 }
